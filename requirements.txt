@@ -2,4 +2,3 @@ datasets
 transformers
 torch
 numpy
-faiss
