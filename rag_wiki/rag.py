@@ -24,12 +24,21 @@ def get_embedding_model(model_name="sentence-transformers/all-MiniLM-L6-v2"):
     :param model_name:
     :return: model, tokenizer
     """
-    model = AutoModel.from_pretrained(model_name)
+    device = "cpu"
+    if torch.cuda.is_available():
+        print("Creating model on GPU")
+        device = "cuda"
+    model = AutoModel.from_pretrained(model_name).to(device)
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     return model, tokenizer
 
 def encode(texts, model, tokenizer, debug=False):
+    device = "cpu"
+    if torch.cuda.is_available():
+        print("Encoding on GPU")
+        device = "cuda"
     tokens = tokenizer(texts, return_tensors="pt", truncation=True, padding=True, max_length=512)
+    tokens = {key: value.to(device) for key, value in tokens.items()}  # Move input tensors to GPU
     with torch.no_grad():
         # Do a forward pass and use [CLS] token embeddings
         model_output = model(**tokens)
@@ -58,9 +67,13 @@ def preprocess(dataset, debug=False):
         print("Embeddings shape: ", embeddings.shape)
 
     # Add the embeddings to an index
+    index = faiss.IndexFlatL2(embeddings.shape[1])
+    if torch.cuda.is_available():
+        print("Creating GPU faiss index")
+        res = faiss.StandardGpuResources()
+        index = faiss.index_cpu_to_gpu(res, 0, index)
     if debug:
         print("Adding embeddings to the index...")
-    index = faiss.IndexFlatL2(embeddings.shape[1])
     index.add(embeddings)
     if debug:
         print("Index is added with embeddings")
