@@ -2,7 +2,7 @@
 Main module for the RAG project.
 
 """
-import rag
+from rag_wiki import rag
 
 if __name__ == '__main__':
     # Load dataset
