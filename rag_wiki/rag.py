@@ -37,14 +37,25 @@ def encode(texts, model, tokenizer, debug=False):
     if torch.cuda.is_available():
         print("Encoding on GPU")
         device = "cuda"
-    tokens = tokenizer(texts, return_tensors="pt", truncation=True, padding=True, max_length=512)
-    tokens = {key: value.to(device) for key, value in tokens.items()}  # Move input tensors to GPU
-    with torch.no_grad():
-        # Do a forward pass and use [CLS] token embeddings
-        model_output = model(**tokens)
-        embeddings = model_output.last_hidden_state[:, 0, :].numpy()
-        if debug:
-            print("Embeddings shape: ", embeddings.shape)
+
+    embeddings = []
+    batch_size = 1000
+    for i in range(0, len(texts), batch_size):
+        batch_texts = texts[i:i+batch_size]  # get a batch of texts
+        tokens = tokenizer(batch_texts, return_tensors="pt", truncation=True, padding=True, max_length=512)
+        tokens = {key: value.to(device) for key, value in tokens.items()}  # Move input tensors to GPU
+
+        with torch.no_grad():
+            # Do a forward pass and use [CLS] token embeddings
+            model_output = model(**tokens)
+            batch_embeddings = model_output.last_hidden_state[:, 0, :].numpy()
+            if debug:
+                print(f"Processed batch {i}:{i+batch_size}")
+                print("Batch embeddings shape: ", batch_embeddings.shape)
+            embeddings.append(batch_embeddings)
+
+    if debug:
+        print("Embeddings shape: ", embeddings.shape)
     return embeddings
 
 def preprocess(dataset, debug=False):
