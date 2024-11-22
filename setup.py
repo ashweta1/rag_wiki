@@ -9,6 +9,7 @@ setup(
         "transformers",
         "torch",
         "numpy",
+        "faiss-cpu",
     ],
     description="A Python package for RAG from Wikipedia.",
     author="Shweta Agrawal",
