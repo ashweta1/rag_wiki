@@ -85,7 +85,7 @@ def preprocess(dataset, batch_size=1000, debug=False):
 
     index.add(embeddings)
     debug and print("Index dimension: ", index.d)
-    debug and print("Adding embeddings to the index... done.")
+    debug and   print("Adding embeddings to the index... done.")
 
     return index, texts
 
@@ -117,7 +117,7 @@ def retrieve(prompts, index, texts, top_k=5, debug=False):
     debug and print("Top k ", top_k)
     _, indices = index.search(prompt_embeddings, top_k)
     debug and print("Search for texts in the index... done.")
-    debug and print("# All prompt indices: ", len(indices))
+    debug and print("All prompt indices: ", indices)
 
     # Get actual retrieved texts from indices
     debug and print("Getting actual text from indices...")
