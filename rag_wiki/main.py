@@ -2,31 +2,41 @@
 Main module for the RAG project.
 
 """
+import datasets
+
 from rag_wiki import rag
 
 if __name__ == '__main__':
-    NUM_EXAMPLES = 100
-    BATCH_SIZE = 100
     TOP_K_TEXTS = 1
     # DATA_SOURCE = "kiltwiki"
     DATA_SOURCE = "wikiqa"
 
     # Load and preprocess the dataset
     if DATA_SOURCE == "wikiqa":
-        print("Loading dataset...")
-        pdframe = rag.load_wikiqa("../data/WikiQACorpus/WikiQA-train.tsv")
+        print("Loading wikiqa dataset...")
+        # pdframe = rag.load_wikiqa("../data/WikiQACorpus/WikiQA-train.tsv")
+        dataset = datasets.load_dataset("wiki_qa", split="train")
         print("Loading dataset...done")
+        print(dataset)
+        for example in dataset:
+            print(example['label'])
+            break
+
         print("")
+
         print("Preprocessing dataset...")
-        index, texts = rag.preprocess_pdframe(pdframe, batch_size=100, debug=True)
+        index, texts = rag.preprocess_wikiqa(dataset, batch_size=500, debug=True)
         print("Preprocessing dataset...done")
+
     else:
         print("Loading dataset...")
-        dataset = rag.load_wiki_dataset(num_examples=NUM_EXAMPLES, debug=True)
+        dataset = rag.load_dataset_num("kilt_wikipedia", num_examples=100, debug=True)
         print("Loading dataset...done")
+
         print("")
+
         print("Preprocessing dataset...")
-        index, texts = rag.preprocess(dataset, batch_size=BATCH_SIZE, debug=True)
+        index, texts = rag.preprocess_kiltwiki(dataset, batch_size=100, debug=True)
         print("Preprocessing dataset...done")
     print("")
 

@@ -1,33 +1,25 @@
 import pandas as pd
 import torch
 import faiss
-from itertools import islice
 from rag_wiki.util import best_device
+from rag_wiki.util import batched_iterable
 from datasets import load_dataset
 import numpy as np
 from transformers import AutoModel, AutoTokenizer
 
-def load_wiki_dataset(num_examples=None, debug=False):
-    path = "kilt_wikipedia"
+def load_dataset_num(path, num_examples=None, debug=False):
     print(f"Loading dataset from {path}")
     dataset = load_dataset(path, split="full", streaming=True, trust_remote_code=True)
     if num_examples is not None:
         dataset = dataset.take(num_examples)
     debug and print(dataset)
-    if debug:
-        for x in dataset:
-            print(x)
-            break
-
     return dataset
 
 def load_wikiqa(file_path):
     """
     Load, clean, and filter the WikiQA dataset to extract only answers with true labels.
-
     Args:
         file_path (str): Path to the WikiQA dataset file (typically TSV format).
-
     Returns:
         pd.DataFrame: A DataFrame containing questions and their corresponding correct answers.
     """
@@ -102,17 +94,10 @@ def encode(texts, model, tokenizer, debug=False):
     return embeddings
 
 
-def preprocess(dataset, batch_size=1000, debug=False):
+def preprocess_kiltwiki(dataset, batch_size=100, debug=False):
     model, tokenizer, index = initialize_model_and_index(debug)
 
     # Encode and store embeddings for texts in batches
-    def batched_iterable(dataset, batch_size):
-        iterator = iter(dataset)
-        while True:
-            batch = list(islice(iterator, batch_size))
-            if not batch:
-                break
-            yield batch
     texts = []
     for batch_idx, batch in enumerate(batched_iterable(dataset, batch_size)):
         print(f"Batch {batch_idx + 1}")
@@ -138,7 +123,31 @@ def preprocess(dataset, batch_size=1000, debug=False):
     debug and print("Length of texts = ", len(texts))  # expect total size.
     return index, texts
 
-def preprocess_pdframe(pdframe, batch_size=1000, debug=False):
+
+def preprocess_wikiqa(dataset, batch_size=100, debug=False):
+    model, tokenizer, index = initialize_model_and_index(debug)
+
+    # Encode and store embeddings for texts in batches
+    texts = []
+    for batch_idx, batch in enumerate(batched_iterable(dataset, batch_size)):
+        print(f"Batch {batch_idx + 1}")
+
+        batch_texts = [str(example['question'] + " " + example["answer"])
+                            for example in batch if example['label'] == 1]
+
+        if len(batch_texts) > 0:
+            # Encode batch_texts using the model and tokenizer
+            embeddings = encode(batch_texts, model, tokenizer, debug)
+            # Add the embeddings to the index
+            index.add(embeddings)
+            # Add batch_texts to texts
+            texts.extend(batch_texts)
+
+    debug and print("Length of texts = ", len(texts))  # expect total size.
+    return index, texts
+
+
+def preprocess_wikiqa_pdframe(pdframe, batch_size=100, debug=False):
     model, tokenizer, index = initialize_model_and_index(debug)
 
     # Split DataFrame into n batches
