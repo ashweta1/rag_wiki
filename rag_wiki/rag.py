@@ -1,8 +1,10 @@
+import pandas as pd
 import torch
 import faiss
 from itertools import islice
 from rag_wiki.util import best_device
 from datasets import load_dataset
+import numpy as np
 from transformers import AutoModel, AutoTokenizer
 
 def load_wiki_dataset(num_examples=None, debug=False):
@@ -19,6 +21,36 @@ def load_wiki_dataset(num_examples=None, debug=False):
 
     return dataset
 
+def load_wikiqa(file_path):
+    """
+    Load, clean, and filter the WikiQA dataset to extract only answers with true labels.
+
+    Args:
+        file_path (str): Path to the WikiQA dataset file (typically TSV format).
+
+    Returns:
+        pd.DataFrame: A DataFrame containing questions and their corresponding correct answers.
+    """
+    # Load the dataset
+    df = pd.read_csv(file_path, sep='\t')
+
+    # Inspect columns (use appropriate column names based on your dataset version)
+    print("Columns in dataset:", df.columns)
+
+    # Ensure the dataset contains required columns
+    required_columns = ['Question', 'Sentence', 'Label']
+    for col in required_columns:
+        if col not in df.columns:
+            raise ValueError(f"Missing required column: {col}")
+
+    # Filter only answers with true labels (Label == 1)
+    true_answers = df[df['Label'] == 1]
+    # Drop duplicates to keep unique (Question, Answer) pairs
+    true_answers = true_answers[['Question', 'Sentence']].drop_duplicates()
+    # Reset index for a clean DataFrame
+    true_answers.reset_index(drop=True, inplace=True)
+
+    return true_answers
 
 def get_embedding_model(model_name="sentence-transformers/all-MiniLM-L6-v2"):
     """
@@ -29,6 +61,29 @@ def get_embedding_model(model_name="sentence-transformers/all-MiniLM-L6-v2"):
     model = AutoModel.from_pretrained(model_name).to(best_device())
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     return model, tokenizer
+
+def initialize_model_and_index(debug=False):
+    # print what device we have.
+    debug and print("device = ", best_device())
+
+    # Get the model to generate embeddings
+    debug and print("Getting the model and tokenizer for embeddings...")
+    model, tokenizer = get_embedding_model()
+    # Get the embeddings size
+    embedding_size = model.config.hidden_size
+    debug and print("Embedding size = ", embedding_size)
+    debug and print("Getting the model and tokenizer for embeddings... done")
+
+    # Create FAISS index
+    debug and print("Creating FAISS index for storing and searching the embeddings...")
+    index = faiss.IndexFlatL2(embedding_size)
+    if best_device() == "cuda":
+        print("Moving the index to GPU")
+        res = faiss.StandardGpuResources()
+        index = faiss.index_cpu_to_gpu(res, 0, index)
+    debug and print("Creating FAISS index... done")
+
+    return model, tokenizer, index
 
 
 def encode(texts, model, tokenizer, debug=False):
@@ -48,25 +103,7 @@ def encode(texts, model, tokenizer, debug=False):
 
 
 def preprocess(dataset, batch_size=1000, debug=False):
-     # print what device we have.
-    debug and print("device = ", best_device())
-
-    # Get the model to generate embeddings
-    debug and print("Getting the model and tokenizer for embeddings...")
-    model, tokenizer = get_embedding_model()
-    # Get the embeddings size
-    embedding_size = model.config.hidden_size
-    debug and print("Embedding size = ", embedding_size)
-    debug and print("Getting the model and tokenizer for embeddings... done")
-
-    # Create FAISS index
-    debug and print("Creating FAISS index for storing and searching the embeddings...")
-    index = faiss.IndexFlatL2(embedding_size)
-    if best_device() == "cuda":
-        print("Moving the index to GPU")
-        res = faiss.StandardGpuResources()
-        index = faiss.index_cpu_to_gpu(res, 0, index)
-    debug and print("Creating FAISS index... done")
+    model, tokenizer, index = initialize_model_and_index(debug)
 
     # Encode and store embeddings for texts in batches
     def batched_iterable(dataset, batch_size):
@@ -99,6 +136,30 @@ def preprocess(dataset, batch_size=1000, debug=False):
         texts.extend(batch_texts)
 
     debug and print("Length of texts = ", len(texts))  # expect total size.
+    return index, texts
+
+def preprocess_pdframe(pdframe, batch_size=1000, debug=False):
+    model, tokenizer, index = initialize_model_and_index(debug)
+
+    # Split DataFrame into n batches
+    batches = np.array_split(pdframe, len(pdframe) // batch_size)
+
+    texts = []
+    for batch_idx, batch in enumerate(batches):
+        print(f"Batch {batch_idx + 1}")
+
+        # Convert pdframe columns question and sentence into texts.
+        batch_texts = (batch['Question'] + " " + batch['Sentence']).tolist()
+
+        # Generate embeddings
+        embeddings = encode(batch_texts, model, tokenizer, debug)
+
+        # Add embeddings to the index
+        index.add(embeddings)
+
+        # Add batch_texts to texts
+        texts.extend(batch_texts)
+
     return index, texts
 
 

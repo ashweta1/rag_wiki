@@ -8,17 +8,26 @@ if __name__ == '__main__':
     NUM_EXAMPLES = 100
     BATCH_SIZE = 100
     TOP_K_TEXTS = 1
+    # DATA_SOURCE = "kiltwiki"
+    DATA_SOURCE = "wikiqa"
 
-    # Load dataset
-    print("Loading dataset...")
-    dataset = rag.load_wiki_dataset(num_examples=NUM_EXAMPLES, debug=True)
-    print("Loading dataset...done")
-    print("")
-
-    # Preprocess the dataset
-    print("Preprocessing dataset...")
-    index, texts = rag.preprocess(dataset, batch_size=BATCH_SIZE, debug=True)
-    print("Preprocessing dataset...done")
+    # Load and preprocess the dataset
+    if DATA_SOURCE == "wikiqa":
+        print("Loading dataset...")
+        pdframe = rag.load_wikiqa("../data/WikiQACorpus/WikiQA-train.tsv")
+        print("Loading dataset...done")
+        print("")
+        print("Preprocessing dataset...")
+        index, texts = rag.preprocess_pdframe(pdframe, batch_size=100, debug=True)
+        print("Preprocessing dataset...done")
+    else:
+        print("Loading dataset...")
+        dataset = rag.load_wiki_dataset(num_examples=NUM_EXAMPLES, debug=True)
+        print("Loading dataset...done")
+        print("")
+        print("Preprocessing dataset...")
+        index, texts = rag.preprocess(dataset, batch_size=BATCH_SIZE, debug=True)
+        print("Preprocessing dataset...done")
     print("")
 
     # Retrieve relevant texts
