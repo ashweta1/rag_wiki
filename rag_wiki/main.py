@@ -11,8 +11,10 @@ if __name__ == '__main__':
     # DATA_SOURCE = "kiltwiki"
     DATA_SOURCE = "wikiqa"
 
-    # Load and preprocess the dataset
+      # Load and preprocess the dataset
     if DATA_SOURCE == "wikiqa":
+        model, tokenizer, index = rag.initialize_model_and_index(debug=False)
+
         print("Loading wikiqa dataset...")
         # pdframe = rag.load_wikiqa("../data/WikiQACorpus/WikiQA-train.tsv")
         dataset = datasets.load_dataset("wiki_qa", split="train")
@@ -25,7 +27,13 @@ if __name__ == '__main__':
         print("")
 
         print("Preprocessing dataset...")
-        index, texts = rag.preprocess_wikiqa(dataset, batch_size=500, debug=True)
+        # index, texts = rag.preprocess_wikiqa(dataset, batch_size=500, debug=True)
+        texts = []
+        rag.add_dataset_to_index(dataset, "wikiqa",
+                                 model, tokenizer,
+                                 index, texts,
+                                 batch_size=500,
+                                 debug=False)
         print("Preprocessing dataset...done")
 
     else:

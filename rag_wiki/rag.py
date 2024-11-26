@@ -146,6 +146,41 @@ def preprocess_wikiqa(dataset, batch_size=100, debug=False):
     debug and print("Length of texts = ", len(texts))  # expect total size.
     return index, texts
 
+def add_dataset_to_index(dataset,
+                         dataset_type,
+                         model,
+                         tokenizer,
+                         index,
+                         texts,
+                         batch_size=100,
+                         debug=False):
+    # Encode and store embeddings for texts in batches
+    for batch_idx, batch in enumerate(batched_iterable(dataset, batch_size)):
+        print(f"Batch {batch_idx + 1}")
+
+        if dataset_type == "wikiqa":
+            batch_texts = [str(example['question'] + " " + example["answer"])
+                                for example in batch if example['label'] == 1]
+        elif dataset_type == "squad":
+            batch_texts = [str(example['question'] + " " + example["answers"]["text"][0])
+                                for example in batch if len(example["answers"]["text"]) > 0]
+        elif dataset_type == "knowns":
+            batch_texts = [str(example['prompt'] + " " + example["prediction"])
+                                for example in batch]
+        else:
+            raise ValueError(f"Unknown dataset type: {dataset_type}")
+
+        if len(batch_texts) > 0:
+            # Encode batch_texts using the model and tokenizer
+            embeddings = encode(batch_texts, model, tokenizer, debug)
+            # Add the embeddings to the index
+            index.add(embeddings)
+            # Add batch_texts to texts
+            texts.extend(batch_texts)
+
+    debug and print("Length of texts = ", len(texts))  # expect total size.
+    return index, texts
+
 
 def preprocess_wikiqa_pdframe(pdframe, batch_size=100, debug=False):
     model, tokenizer, index = initialize_model_and_index(debug)
